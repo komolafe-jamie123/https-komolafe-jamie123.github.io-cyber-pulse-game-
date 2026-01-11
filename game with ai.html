@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong vs AI</title>
+    <style>
+        body {
+            background-color: #111;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            color: #fff;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            border: 2px solid #fff;
+            background-color: #000;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="800" height="500"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // --- GAME OBJECTS ---
+
+    // Player Paddle (Left)
+    const player = {
+        x: 0, y: 200, width: 15, height: 90,
+        color: '#00f3ff', score: 0
+    };
+
+    // AI Paddle (Right)
+    const ai = {
+        x: 785, y: 200, width: 15, height: 90,
+        color: '#ff0055', score: 0, speed: 5
+    };
+
+    // Ball
+    const ball = {
+        x: 400, y: 250, radius: 8, speed: 7,
+        velocityX: 5, velocityY: 5, color: '#fff'
+    };
+
+    // --- INPUT (Player) ---
+    canvas.addEventListener('mousemove', (event) => {
+        const rect = canvas.getBoundingClientRect();
+        // Scale mouse pos to canvas size
+        const root = document.documentElement;
+        let mouseY = event.clientY - rect.top - root.scrollTop;
+        
+        // Center paddle on mouse
+        player.y = mouseY - player.height / 2;
+    });
+
+    // --- UPDATE FUNCTION (AI LOGIC IS HERE) ---
+    function update() {
+        // 1. Move Ball
+        ball.x += ball.velocityX;
+        ball.y += ball.velocityY;
+
+        // 2. Wall Collision (Top/Bottom)
+        if (ball.y - ball.radius < 0 || ball.y + ball.radius > canvas.height) {
+            ball.velocityY = -ball.velocityY;
+        }
+
+        // 3. Determine which paddle to check
+        let computerLevel = 0.09; // How slow the AI reacts (0.1 = perfect, 0.05 = easy)
+        let playerOrAi = (ball.x < canvas.width / 2) ? player : ai;
+
+        // 4. Paddle Collision Logic
+        if (collision(ball, playerOrAi)) {
+            // Calculate hit point relative to center of paddle
+            let collidePoint = (ball.y - (playerOrAi.y + playerOrAi.height / 2));
+            // Normalize
+            collidePoint = collidePoint / (playerOrAi.height / 2);
+
+            // Angle calculation (max 45 degrees)
+            let angleRad = (Math.PI / 4) * collidePoint;
+
+            // Direction change
+            let direction = (ball.x < canvas.width / 2) ? 1 : -1;
+            ball.velocityX = direction * ball.speed * Math.cos(angleRad);
+            ball.velocityY = ball.speed * Math.sin(angleRad);
+            
+            // Increase ball speed slightly on every hit
+            ball.speed += 0.2;
+        }
+
+        // 5. AI MOVEMENT (The Brain)
+        // The AI moves the center of its paddle towards the center of the ball
+        let aiCenter = ai.y + (ai.height / 2);
+        if (aiCenter < ball.y - 35) {
+            ai.y += ai.speed; // Move down
+        } else if (aiCenter > ball.y + 35) {
+            ai.y -= ai.speed; // Move up
+        }
+
+        // 6. Scoring
+        if (ball.x - ball.radius < 0) {
+            ai.score++;
+            resetBall();
+        } else if (ball.x + ball.radius > canvas.width) {
+            player.score++;
+            resetBall();
+        }
+    }
+
+    function collision(b, p) {
+        p.top = p.y;
+        p.bottom = p.y + p.height;
+        p.left = p.x;
+        p.right = p.x + p.width;
+
+        b.top = b.y - b.radius;
+        b.bottom = b.y + b.radius;
+        b.left = b.x - b.radius;
+        b.right = b.x + b.radius;
+
+        return p.left < b.right && p.top < b.bottom && p.right > b.left && p.bottom > b.top;
+    }
+
+    function resetBall() {
+        ball.x = canvas.width / 2;
+        ball.y = canvas.height / 2;
+        ball.speed = 7;
+        ball.velocityX = -ball.velocityX; // Change serve direction
+    }
+
+    function draw() {
+        // Clear screen
+        ctx.fillStyle = "rgba(0,0,0,0.2)"; // Trail effect
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Net
+        ctx.fillStyle = "#333";
+        ctx.fillRect(canvas.width / 2 - 1, 0, 2, canvas.height);
+
+        // Draw Player
+        ctx.fillStyle = player.color;
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+
+        // Draw AI
+        ctx.fillStyle = ai.color;
+        ctx.fillRect(ai.x, ai.y, ai.width, ai.height);
+
+        // Draw Ball
+        ctx.fillStyle = ball.color;
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw Scores
+        ctx.font = "50px monospace";
+        ctx.fillText(player.score, canvas.width / 4, 60);
+        ctx.fillText(ai.score, 3 * canvas.width / 4, 60);
+
+        requestAnimationFrame(() => {
+            update();
+            draw();
+        });
+    }
+
+    // Start
+    draw();
+
+</script>
+</body>
+</html>
